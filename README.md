@@ -11,6 +11,27 @@ Každá fáze dostane původní zadání a výstup předchozí fáze. Průběh, 
 
 Aplikace nemá žádné závislosti, používá jen Node.js a jeho standardní knihovnu (`node:http`, `node:sqlite`, `fetch`).
 
+## Jak aplikace plní zadání
+
+| Požadavek | Kde v kódu |
+|---|---|
+| 4 subagenti s odlišnými rolemi | `server.mjs`: pole `stages` a systémové prompty v `run` |
+| Explicitní sekvenční orchestrace v kódu, ne v jednom promptu | `server.mjs`: funkce `run` volá fáze postupně ve smyčce |
+| Handoff: výstup jedné fáze je vstupem další; writer dostává i původní nálezy Research | `server.mjs`: `run` skládá zprávu `user` z původního zadání a výstupu předchozí fáze |
+| Přímé volání API bez wrapperů, `messages` se system promptem | `server.mjs`: `callModel` (`fetch` na `openrouter.ai/api/v1/chat/completions`) |
+| Tool, který agent skutečně volá | `server.mjs`: `callModel` předává `tools: [{type: 'openrouter:web_search'}]` agentovi Research; bez potvrzeného použití v `usage` fáze selže |
+| Vlastní Skilly v `SKILL.md`, reálně použité | `skills/*/SKILL.md`, načtené při startu a vložené do system promptu agentů Research, analytik a writer |
+| UI ukazuje, co který agent dělá a jaký má výstup | `public/app.js` (`render`): stav fází, časová osa, rozbalovací výstupy každého agenta |
+
+### Předávání mezi agenty
+
+```
+zadání + přílohy ─► Gateway ─(brief)─► Research + web_search ─(nálezy, zdroje)─► Super analytik ─(analýza)─► Writer ─► zpráva
+                                              └──────────────── původní nálezy ─────────────────────────────►┘
+```
+
+Každý agent je samostatné volání API s vlastním system promptem. Stav každé fáze (čeká, pracuje, hotovo, chyba), její výstup, model, tokeny a cena se ukládají a zobrazují v UI.
+
 ## Funkce
 
 - **Příprava zadání v chatu s analytikem.** Rozhovor pomůže zadání upřesnit (nejvýše 10 výměn). Návrh lze převzít do formuláře a ručně upravit. Výzkum se spustí tlačítkem nebo jednoznačným příkazem v chatu (např. „rovnou začni“).
