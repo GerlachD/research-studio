@@ -36,6 +36,7 @@ Každý agent je samostatné volání API s vlastním system promptem. Stav kaž
 
 - **Příprava zadání v chatu s analytikem.** Rozhovor pomůže zadání upřesnit (nejvýše 10 výměn). Návrh lze převzít do formuláře a ručně upravit. Výzkum se spustí tlačítkem nebo jednoznačným příkazem v chatu (např. „rovnou začni“).
 - **Přílohy.** Soubory TXT, MD a CSV, celkem do 25 000 znaků. Obsah příloh se agentům předává jako data, ne jako instrukce.
+- **Grafy a tabulky ve zprávě.** Writer může do zprávy vložit Markdown tabulky a grafy (sloupcový, čárový, koláčový) jako blok ` ```chart ` s JSON daty. Prohlížeč je vykreslí jako SVG bez externích knihoven, s legendou, zdrojem a sbalitelnou tabulkou dat; neplatná data se zobrazí jako kód.
 - **Dashboard výzkumu.** Každý běh má vlastní adresu `/research/<id>`. Detail obsahuje pipeline čtyř agentů se stavem fází, závěrečnou zprávu, rozbalovací výstupy agentů, časovou osu skutečných událostí a statistiky fází (čas, model, tokeny a cena podle OpenRouteru).
 - **Přehled výzkumů.** Uložené běhy přežijí restart. Rozpracovaný běh se po restartu označí jako přerušený a znovu se automaticky nespouští.
 - **Vlastní skilly.** Metodiky v `skills/*/SKILL.md` se vkládají do systémové zprávy příslušné fáze.

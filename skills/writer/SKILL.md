@@ -38,10 +38,29 @@ Tabulka, pokud zadání srovnání vyžaduje.
 ## Zdroje
 ```
 
+## Tabulky a grafy
+Použij je, jen když zpráva obsahuje čísla doložená zdroji z výzkumu. Nikdy si hodnoty nedopočítávej ani neodhaduj kvůli grafu.
+
+- **Tabulka** (Markdown) pro srovnání více položek ve více vlastnostech, např. konkurenty podle ceny, funkcí a trhu.
+- **Graf** pro číselné srovnání nebo vývoj. Zapiš ho jako blok kódu s jazykem `chart` a platným JSON:
+
+```chart
+{"type": "bar", "title": "Tržby podle let", "unit": "mil. Kč", "labels": ["2022", "2023", "2024"], "series": [{"name": "Firma A", "values": [10, 12, 15]}], "source": "https://…"}
+```
+
+| `type` | Kdy použít |
+|---|---|
+| `bar` | Srovnání hodnot mezi kategoriemi; více řad = seskupené sloupce |
+| `line` | Vývoj v čase (alespoň 3 body), jedna nebo více křivek |
+| `pie` | Podíly na celku, který dává smysl sčítat; jen jedna řada, nezáporné hodnoty, nejvýše 6 dílů |
+
+Pravidla: `labels` a každé `values` mají stejnou délku, hodnoty jsou čísla bez jednotek, jednotka patří do `unit`. Vždy vyplň `title` a `source` (URL zdroje dat). Nejvýše 6 řad a 24 popisků. Pod graf napiš jednu větu, co z něj plyne. Neplatný graf se zobrazí jen jako kód.
+
 ## Kontrola před odevzdáním
 - Odpovídá shrnutí přímo na otázku ze zadání?
 - Má každé číslo a podstatné tvrzení odkaz?
 - Je zpráva srozumitelná zadanému publiku bez čtení mezivýstupů?
+- Vycházejí všechny hodnoty v grafech a tabulkách z doložených zdrojů a má každý graf `title` a `source`?
 
 ## Příklad (ilustrační formát, ne fakt k citaci)
 > ## Shrnutí

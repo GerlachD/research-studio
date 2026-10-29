@@ -4,6 +4,79 @@ const descriptions = {gateway:'Připravuje výzkumný brief',research:'Hledá re
 const researchBase = new URL('research/', document.baseURI).pathname;
 const researchId = location.pathname.startsWith(researchBase) ? location.pathname.slice(researchBase.length) : null;
 const escape = value => String(value ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
+// Grafy ze zprávy: blok ```chart s JSON {type:'bar'|'line'|'pie', title, labels, series:[{name, values}], unit, source}
+const chartColors = ['#df6035', '#5b9bd5', '#3fae9a', '#e3b448', '#a87bd6', '#d16a8f'];
+const formatNumber = value => value.toLocaleString('cs-CZ', {maximumFractionDigits:2});
+function parseChart(text) {
+  let spec;
+  try { spec = JSON.parse(text); } catch { return null; }
+  const labels = Array.isArray(spec?.labels) ? spec.labels.slice(0, 24).map(String) : [];
+  const series = (Array.isArray(spec?.series) ? spec.series : []).slice(0, chartColors.length)
+    .map(item => ({name:String(item?.name ?? ''), values:Array.isArray(item?.values) ? item.values.slice(0, labels.length).map(Number) : []}))
+    .filter(item => item.values.length === labels.length && item.values.every(Number.isFinite));
+  if (!['bar', 'line', 'pie'].includes(spec?.type) || !labels.length || !series.length) return null;
+  if (spec.type === 'pie' && (series[0].values.some(value => value < 0) || !series[0].values.some(value => value > 0))) return null;
+  return {type:spec.type, title:String(spec.title ?? ''), unit:String(spec.unit ?? ''), source:String(spec.source ?? ''), labels, series:spec.type === 'pie' ? series.slice(0, 1) : series};
+}
+// Zaokrouhlený krok osy (1, 2, 2,5, 5 × 10^n), aby popisky byly čitelná čísla
+function niceStep(range) {
+  const power = 10 ** Math.floor(Math.log10(range)), fraction = range / power;
+  return power * (fraction <= 1 ? 1 : fraction <= 2 ? 2 : fraction <= 2.5 ? 2.5 : fraction <= 5 ? 5 : 10);
+}
+function chartAxis(spec, width, height, pad) {
+  const all = spec.series.flatMap(item => item.values);
+  // Sloupce musí začínat od nuly; křivka se přizpůsobí rozsahu dat, aby nebyla stlačená
+  let low = spec.type === 'bar' ? Math.min(0, ...all) : Math.min(...all), high = spec.type === 'bar' ? Math.max(0, ...all) : Math.max(...all);
+  if (high === low) { high += 1; low = Math.min(low, 0); }
+  const step = niceStep((high - low) / 4), min = Math.floor(low / step) * step, max = Math.ceil(high / step) * step;
+  const y = value => pad.top + (max - value) / (max - min) * (height - pad.top - pad.bottom);
+  const grid = Array.from({length:Math.round((max - min) / step) + 1}, (_, n) => min + step * n).map(tick => `<line x1="${pad.left}" x2="${width - pad.right}" y1="${y(tick)}" y2="${y(tick)}" class="chart-grid"/><text x="${pad.left - 8}" y="${y(tick) + 4}" text-anchor="end" class="chart-axis">${escape(formatNumber(tick))}</text>`).join('');
+  return {y, grid};
+}
+const chartLabel = (x, y, text) => `<text x="${x}" y="${y}" text-anchor="middle" class="chart-axis">${escape(text)}</text>`;
+const chartTip = text => `<title>${escape(text)}</title>`;
+function barSvg(spec, width, height, pad) {
+  const {y, grid} = chartAxis(spec, width, height, pad);
+  const slot = (width - pad.left - pad.right) / spec.labels.length, bar = slot * 0.7 / spec.series.length;
+  return grid + spec.labels.map((label, n) => spec.series.map((item, s) => {
+    const value = item.values[n], x = pad.left + slot * n + slot * 0.15 + bar * s;
+    return `<rect x="${x}" y="${Math.min(y(value), y(0))}" width="${Math.max(bar - 2, 1)}" height="${Math.abs(y(value) - y(0))}" rx="3" fill="${chartColors[s]}">${chartTip(`${label} – ${item.name}: ${formatNumber(value)} ${spec.unit}`)}</rect>`;
+  }).join('') + chartLabel(pad.left + slot * (n + 0.5), height - pad.bottom + 18, label.slice(0, 18))).join('');
+}
+function lineSvg(spec, width, height, pad) {
+  const {y, grid} = chartAxis(spec, width, height, pad);
+  const inset = 24, step = (width - pad.left - pad.right - inset * 2) / Math.max(spec.labels.length - 1, 1), x = n => pad.left + inset + step * n;
+  const every = Math.ceil(spec.labels.length / 8);
+  const lines = spec.series.map((item, s) => `<polyline points="${item.values.map((value, n) => `${x(n)},${y(value)}`).join(' ')}" fill="none" stroke="${chartColors[s]}" stroke-width="2.5" stroke-linejoin="round"/>` +
+    item.values.map((value, n) => `<circle cx="${x(n)}" cy="${y(value)}" r="4" fill="${chartColors[s]}">${chartTip(`${spec.labels[n]} – ${item.name}: ${formatNumber(value)} ${spec.unit}`)}</circle>`).join('')).join('');
+  return grid + lines + spec.labels.map((label, n) => n % every ? '' : chartLabel(x(n), height - pad.bottom + 18, label.slice(0, 14))).join('');
+}
+function pieSvg(spec, width, height) {
+  const values = spec.series[0].values, total = values.reduce((sum, value) => sum + value, 0);
+  const cx = width / 2, cy = height / 2, r = height / 2 - 16, point = a => `${cx + r * Math.cos(a)},${cy + r * Math.sin(a)}`;
+  let angle = -Math.PI / 2;
+  return values.map((value, n) => {
+    const share = value / total, end = angle + share * Math.PI * 2, fill = `fill="${chartColors[n % chartColors.length]}" stroke="#202020" stroke-width="2"`;
+    const tip = chartTip(`${spec.labels[n]}: ${formatNumber(value)} ${spec.unit} (${formatNumber(share * 100)} %)`);
+    const slice = share > 0.9999 ? `<circle cx="${cx}" cy="${cy}" r="${r}" ${fill}>${tip}</circle>` : `<path d="M${cx},${cy} L${point(angle)} A${r},${r} 0 ${share > 0.5 ? 1 : 0} 1 ${point(end)} Z" ${fill}>${tip}</path>`;
+    angle = end;
+    return slice;
+  }).join('');
+}
+function chartTable(spec) {
+  const head = `<tr><th>${escape(spec.unit || 'Položka')}</th>${spec.series.map(item => `<th>${escape(item.name || 'Hodnota')}</th>`).join('')}</tr>`;
+  const rows = spec.labels.map((label, n) => `<tr><th scope="row">${escape(label)}</th>${spec.series.map(item => `<td>${escape(formatNumber(item.values[n]))}</td>`).join('')}</tr>`).join('');
+  return `<details class="chart-data"><summary>Data grafu</summary><div class="table-wrap"><table><thead>${head}</thead><tbody>${rows}</tbody></table></div></details>`;
+}
+function chart(text, inline) {
+  const spec = parseChart(text);
+  if (!spec) return null;
+  const width = 640, height = 300, pad = {top:16, right:16, bottom:34, left:64};
+  const body = {bar:barSvg, line:lineSvg, pie:pieSvg}[spec.type](spec, width, height, pad);
+  const items = spec.type === 'pie' ? spec.labels.map((label, n) => [`${label}: ${formatNumber(spec.series[0].values[n])} ${spec.unit}`, n % chartColors.length]) : spec.series.map((item, n) => [item.name, n]);
+  const legend = items.map(([label, color]) => `<li><span style="background:${chartColors[color]}"></span>${escape(label)}</li>`).join('');
+  return `<figure class="chart">${spec.title ? `<figcaption>${escape(spec.title)}</figcaption>` : ''}<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${escape(spec.title || 'Graf')}">${body}</svg><ul class="chart-legend">${legend}</ul>${spec.source ? `<p class="chart-source">Zdroj: ${inline(spec.source)}</p>` : ''}${chartTable(spec)}</figure>`;
+}
 function markdown(text) {
   const inline = value => {
     const links = [];
@@ -24,10 +97,11 @@ function markdown(text) {
     const line = lines[i];
     if (!line.trim()) { i++; continue; }
     if (/^\s*```/.test(line)) {
-      const code = []; i++;
+      const language = line.trim().slice(3).trim().toLowerCase(), code = []; i++;
       while (i < lines.length && !/^\s*```/.test(lines[i])) code.push(lines[i++]);
       if (i < lines.length) i++;
-      output.push(`<pre class="code-block"><code>${escape(code.join('\n'))}</code></pre>`); continue;
+      const graph = language === 'chart' ? chart(code.join('\n'), inline) : null;
+      output.push(graph || `<pre class="code-block"><code>${escape(code.join('\n'))}</code></pre>`); continue;
     }
     if (line.includes('|') && isDivider(lines[i + 1])) {
       const header = cells(line), rows = []; i += 2;

@@ -301,3 +301,13 @@ main{padding:0 18px}
 .run-details>summary{list-style:none;cursor:pointer;padding:16px 0;font-weight:650;color:#c5cbd3}
 .run-details>summary::-webkit-details-marker{display:none}
 .run-details .timeline{margin:16px 0 20px}
+.chart{margin:1.4em 0 1.8em;padding:18px;border:1px solid #404040;border-radius:10px;background:#202020}
+.chart figcaption{font-weight:650;font-size:15px;margin-bottom:10px;color:#f2f2f2}
+.chart svg{display:block;width:100%;height:auto;max-height:340px}
+.chart-grid{stroke:#353535;stroke-width:1}
+.chart-axis{fill:#a6aab2;font-size:12px}
+.chart .chart-legend{display:flex;flex-wrap:wrap;gap:6px 16px;list-style:none;padding:0;margin:12px 0 0;font-size:13px;color:#d0d3d8}
+.chart-legend span{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px}
+.chart .chart-source{font-size:12px;color:#a6aab2;margin:10px 0 0}
+.chart-data summary{cursor:pointer;font-size:12px;color:#a6aab2;margin-top:10px}
+.chart .chart-data .table-wrap{margin:10px 0 0}

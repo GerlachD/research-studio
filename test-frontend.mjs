@@ -58,3 +58,28 @@ test('odhad zbývajícího času odečte čas běžící fáze a neopakuje uplyn
   assert.equal(remainingEstimate({...job, events:[]}, 0, 300e3), '—');
   assert.equal(remainingEstimate({...job, status:'done'}, 2, 300e3), '—');
 });
+
+const markdown = runInNewContext(`${source.slice(source.indexOf('const escape ='), source.indexOf('const showForm ='))}\nmarkdown`);
+const chartBlock = spec => '```chart\n' + JSON.stringify(spec) + '\n```';
+
+test('blok chart vykreslí sloupcový, čárový i koláčový graf s tabulkou dat', () => {
+  const series = [{name:'Tržby', values:[10, 20, 30]}];
+  for (const type of ['bar', 'line', 'pie']) {
+    const html = markdown(chartBlock({type, title:'Vývoj', labels:['2022', '2023', '2024'], series, unit:'mil. Kč', source:'https://example.com'}));
+    assert.match(html, /<figure class="chart"><figcaption>Vývoj<\/figcaption><svg/);
+    assert.match(html, /<details class="chart-data">/);
+    assert.match(html, /href="https:\/\/example.com"/);
+  }
+  assert.match(markdown(chartBlock({type:'bar', labels:['A'], series})), /<rect/);
+  assert.match(markdown(chartBlock({type:'line', labels:['A', 'B'], series:[{name:'X', values:[1, 2]}]})), /<polyline/);
+  assert.match(markdown(chartBlock({type:'pie', labels:['A', 'B'], series:[{name:'X', values:[1, 3]}]})), /25 %/);
+});
+
+test('neplatný graf zůstane blokem kódu a texty se escapují', () => {
+  assert.match(markdown('```chart\n{neplatný json\n```'), /<pre class="code-block">/);
+  assert.match(markdown(chartBlock({type:'pie', labels:['A'], series:[{name:'X', values:[-1]}]})), /<pre class="code-block">/);
+  assert.match(markdown(chartBlock({type:'bar', labels:['A', 'B'], series:[{name:'X', values:[1]}]})), /<pre class="code-block">/);
+  const html = markdown(chartBlock({type:'bar', title:'<img src=x onerror=alert(1)>', labels:['<script>'], series:[{name:'"x"', values:[1]}]}));
+  assert.doesNotMatch(html, /<img|<script/);
+  assert.match(html, /&lt;script&gt;/);
+});
