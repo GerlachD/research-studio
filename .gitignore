@@ -1,0 +1,13 @@
+# Whitelist: do veřejného repa jde jen aplikace, testy a dokumentace.
+# Tajné údaje (OR-key.md, .env), data běhů, auditní DB, výstupy a pracovní dokumenty zůstávají lokálně.
+/*
+!/.gitignore
+!/.env.example
+!/README.md
+!/LICENSE
+!/package.json
+!/server.mjs
+!/gate.mjs
+!/test*.mjs
+!/public/
+!/skills/
