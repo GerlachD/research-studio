@@ -72,6 +72,13 @@ $('#files').addEventListener('change',()=>{if($('#files').files.length){attachme
 $('#discard-attachments').onclick=()=>{attachmentRequired=false;$('#attachment-warning').hidden=true;$('#files').value='';saveBrief();};
 if(!researchId){try{const saved=JSON.parse(sessionStorage.getItem(draftKey) || 'null');if(saved){chatMessages=Array.isArray(saved.messages)?saved.messages:[];draft=saved.draft;editedFields=new Set(Array.isArray(saved.edited)?saved.edited:[]);for(const key of briefFields) $('#form').elements[key].value=typeof saved.fields?.[key]==='string'?saved.fields[key]:'';$('#chat-input').value=typeof saved.message==='string'?saved.message:'';for(const message of chatMessages) if(['user','assistant'].includes(message.role)&&typeof message.content==='string')addChatMessage(message.role,message.content);$('#apply-draft').disabled=!draft?.topic || draft.topic.trim().length<5;attachmentRequired=!!saved.hasAttachments;$('#attachment-warning').hidden=!attachmentRequired;$('#form-section').hidden=false;}}catch{$('#chat-error').textContent='Uložený koncept se nepodařilo obnovit.';}}
 function duration(ms){const s=Math.max(0,Math.floor(ms/1000));return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;}
+// Odhad zbývajícího času: průměr dokončených fází × zbývající fáze − čas strávený v běžící fázi
+function remainingEstimate(job, done, now=Date.now()){
+  const lastDone=Math.max(...(job.events||[]).filter(e=>e.type==='completed').map(e=>e.time));
+  if(job.status!=='running' || !done || !Number.isFinite(lastDone)) return '—';
+  const remaining=(lastDone-job.started)/done*(4-done)-(now-lastDone);
+  return remaining>0 ? `≈ ${duration(remaining)}` : 'brzy';
+}
 function renderSummary(job) {
   const done=Object.values(job.steps).filter(step=>step.status==='done').length;
   const states={running:'Probíhá',done:'Dokončeno',failed:'Přerušeno'};
@@ -97,7 +104,7 @@ function renderStatistics(job) {
 function render(job){
   const done=Object.values(job.steps).filter(s=>s.status==='done').length;
   const elapsed=(job.finished||Date.now())-job.started;
-  const estimate=job.status==='running' && done ? `≈ ${duration(elapsed / done * (4-done))}` : '—';
+  const estimate=remainingEstimate(job, done);
   const statuses={waiting:'Čeká',running:'Pracuje',done:'Hotovo',failed:'Chyba'};
   const stages=Object.entries(job.steps).map(([key,s],i)=>`<details data-key="${job.id}-${key}"><summary><span class="number">0${i+1}</span><span class="agent"><strong>${labels[key]}</strong><small>${descriptions[key]}</small></span><span class="status ${s.status}">${statuses[s.status]}</span></summary>${s.output?`<div class="output"><div class="meta">MODEL · ${escape(s.model)} ${s.searchCount?` / VYHLEDÁVÁNÍ · ${s.searchCount}`:''}</div><div class="report-text">${markdown(s.output)}</div></div>`:''}</details>`).join('');
   const flow=Object.entries(job.steps).map(([key,s],i)=>`<div class="flow-step ${s.status} ${i<3 ? 'has-next' : ''} ${s.status==='done' && Object.values(job.steps)[i+1]?.status==='running' ? 'handoff-active' : ''}"><div class="flow-top"><span class="flow-icon">${s.status==='done'?'✓':s.status==='running'?'<span class="orb mini" aria-hidden="true"></span>':i+1}</span><span class="flow-badge">${statuses[s.status]}</span></div><span class="flow-copy"><strong>${labels[key]}</strong><small>${descriptions[key]}</small></span><div class="agent-track" aria-hidden="true"><span></span></div><span class="flow-state">${s.status==='running'?'Probíhá zpracování':s.status==='done'?'Fáze dokončena':s.status==='failed'?'Fáze přerušena':'Čeká na předání'}</span></div>`).join('');

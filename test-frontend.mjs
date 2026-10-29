@@ -45,3 +45,16 @@ test('opuštění rozepsaného konceptu varuje, po spuštění nikoli',()=>{
   let warned=false;handler({preventDefault(){warned=true;}});assert.equal(warned,true);
   sandbox.submitted=true;warned=false;handler({preventDefault(){warned=true;}});assert.equal(warned,false);
 });
+
+const estimateSource = source.slice(source.indexOf('function remainingEstimate('), source.indexOf('function renderSummary('));
+const durationSource = source.slice(source.indexOf('function duration('), source.indexOf('\n', source.indexOf('function duration(')));
+const remainingEstimate = runInNewContext(`${durationSource}\n${estimateSource}\nremainingEstimate`);
+
+test('odhad zbývajícího času odečte čas běžící fáze a neopakuje uplynulý čas', () => {
+  // 2 fáze dokončeny za 4 minuty, třetí běží 1 minutu: zbývá 2 × 2 min − 1 min = 3 min
+  const job = {status:'running', started:0, events:[{type:'completed', time:120e3}, {type:'completed', time:240e3}]};
+  assert.equal(remainingEstimate(job, 2, 300e3), '≈ 3:00');
+  assert.equal(remainingEstimate(job, 2, 900e3), 'brzy');
+  assert.equal(remainingEstimate({...job, events:[]}, 0, 300e3), '—');
+  assert.equal(remainingEstimate({...job, status:'done'}, 2, 300e3), '—');
+});
